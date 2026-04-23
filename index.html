@@ -188,11 +188,18 @@
   /* 旅遊指南詳情卡 */
   .guide-detail-row { display: flex; gap: 6px; align-items: center; font-size: 13px; color: var(--muted); margin-top: 3px; }
   .guide-detail-row span { font-weight: 600; color: var(--text); }
+  /* 景點自動完成搜尋 */
+  .autocomplete-wrapper { position: relative; }
+  .autocomplete-dropdown { position: absolute; top: 100%; left: 0; right: 0; background: var(--card); border: 1.5px solid var(--primary); border-top: none; border-radius: 0 0 12px 12px; z-index: 9999; max-height: 240px; overflow-y: auto; box-shadow: 0 8px 24px rgba(0,0,0,0.12); display: none; }
+  .autocomplete-dropdown.show { display: block; }
+  .autocomplete-item { padding: 12px 14px; cursor: pointer; border-bottom: 1px solid var(--border); transition: background 0.15s; }
+  .autocomplete-item:last-child { border-bottom: none; }
+  .autocomplete-item:active, .autocomplete-item:hover { background: var(--primary-light); }
+  .autocomplete-item-name { font-size: 14px; font-weight: 600; color: var(--text); }
+  .autocomplete-item-addr { font-size: 12px; color: var(--muted); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .autocomplete-loading { padding: 14px; text-align: center; color: var(--muted); font-size: 13px; }
+  .spot-name-input-focused { border-color: var(--primary) !important; border-radius: 10px 10px 0 0 !important; }
 </style>
-
-<link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#FF6B6B">
-
 </head>
 <body>
 
@@ -462,12 +469,15 @@
     <div class="modal-title">📍 新增景點</div>
     <div class="form-group">
       <label class="form-label">景點名稱</label>
-      <input class="form-input" id="spot-name-input" placeholder="例：澎湖後寮天堂路" type="text">
+      <div class="autocomplete-wrapper">
+        <input class="form-input" id="spot-name-input" placeholder="輸入景點名稱搜尋..." type="text" autocomplete="off" oninput="onSpotNameInput(this.value)" onfocus="onSpotNameInput(this.value)" onblur="hideAutocomplete()">
+        <div class="autocomplete-dropdown" id="spot-autocomplete-dropdown"></div>
+      </div>
     </div>
-    <!-- 地址欄位（連結地圖） -->
+    <!-- 地址欄位（自動填入） -->
     <div class="form-group">
-      <label class="form-label">地址（選填，可開啟地圖導航）</label>
-      <input class="form-input" id="spot-address-input" placeholder="例：澎湖縣湖西鄉後寮村" type="text">
+      <label class="form-label">完整地址（自動填入）</label>
+      <input class="form-input" id="spot-address-input" placeholder="選擇景點後自動填入" type="text" readonly style="background:#f5f5f5;color:var(--muted);">
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
       <div class="form-group"><label class="form-label">到達時間</label><input class="form-input" id="spot-time-input" type="time" value="09:00"></div>
@@ -922,11 +932,80 @@ function addDay() {
   showToast(`已新增第${trip.days.length}天`);
 }
 
+// ==================== AUTOCOMPLETE ====================
+let autocompleteTimer = null;
+let autocompleteResults = [];
+
+function onSpotNameInput(val) {
+  clearTimeout(autocompleteTimer);
+  const dropdown = document.getElementById('spot-autocomplete-dropdown');
+  if (!val || val.length < 2) { dropdown.classList.remove('show'); dropdown.innerHTML = ''; return; }
+  dropdown.innerHTML = '<div class="autocomplete-loading">🔍 搜尋中...</div>';
+  dropdown.classList.add('show');
+  autocompleteTimer = setTimeout(() => searchPlaces(val), 400);
+}
+
+async function searchPlaces(query) {
+  const dropdown = document.getElementById('spot-autocomplete-dropdown');
+  try {
+    // 使用 Nominatim OpenStreetMap 免費 API
+    const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=6&accept-language=zh-TW,zh,en&addressdetails=1`;
+    const res = await fetch(url, { headers: { 'Accept-Language': 'zh-TW,zh;q=0.9,en;q=0.8' } });
+    const data = await res.json();
+    autocompleteResults = data;
+    if (!data || data.length === 0) {
+      dropdown.innerHTML = '<div class="autocomplete-loading">未找到相關地點</div>';
+      return;
+    }
+    dropdown.innerHTML = data.map((item, i) => {
+      // 取得地點名稱：優先用 display_name 的第一部分
+      const parts = item.display_name.split(',');
+      const placeName = item.namedetails ? (item.namedetails['name:zh'] || item.namedetails['name'] || parts[0]) : parts[0];
+      const shortAddr = parts.slice(1, 4).join(',').trim();
+      return `<div class="autocomplete-item" onmousedown="selectPlace(${i})">
+        <div class="autocomplete-item-name">${placeName.trim()}</div>
+        <div class="autocomplete-item-addr">${shortAddr}</div>
+      </div>`;
+    }).join('');
+  } catch(e) {
+    dropdown.innerHTML = '<div class="autocomplete-loading">搜尋失敗，請手動輸入</div>';
+  }
+}
+
+function selectPlace(index) {
+  const item = autocompleteResults[index];
+  if (!item) return;
+  const parts = item.display_name.split(',');
+  const placeName = item.namedetails ? (item.namedetails['name:zh'] || item.namedetails['name'] || parts[0]) : parts[0];
+  document.getElementById('spot-name-input').value = placeName.trim();
+  // 地址變為可編輯
+  const addrInput = document.getElementById('spot-address-input');
+  addrInput.value = item.display_name;
+  addrInput.removeAttribute('readonly');
+  addrInput.style.background = '';
+  addrInput.style.color = '';
+  hideAutocomplete();
+}
+
+function hideAutocomplete() {
+  setTimeout(() => {
+    const dropdown = document.getElementById('spot-autocomplete-dropdown');
+    if (dropdown) { dropdown.classList.remove('show'); }
+  }, 150);
+}
+
 function addSpot() {
   selectedSpotType = '🍽️ 餐廳';
   document.querySelectorAll('#spot-type-chips .chip').forEach(c => c.classList.remove('selected'));
   document.querySelector('#spot-type-chips .chip').classList.add('selected');
-  ['spot-name-input','spot-address-input','spot-note-input'].forEach(id => document.getElementById(id).value = '');
+  ['spot-note-input'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('spot-name-input').value = '';
+  const addrInput = document.getElementById('spot-address-input');
+  addrInput.value = '';
+  addrInput.setAttribute('readonly', true);
+  addrInput.style.background = '#f5f5f5';
+  addrInput.style.color = 'var(--muted)';
+  document.getElementById('spot-autocomplete-dropdown').classList.remove('show');
   showModal('modal-add-spot');
 }
 
@@ -1615,12 +1694,5 @@ function showToast(msg) {
 // ==================== INIT ====================
 renderTripList();
 </script>
-
-<script>
-if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("./service-worker.js");
-}
-</script>
-
 </body>
 </html>
