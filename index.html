@@ -11,6 +11,13 @@
 <link rel="apple-touch-icon" sizes="512x512" href="icon-512.png">
 <link rel="manifest" href="manifest.json">
 <title>旅途記帳</title>
+<script>
+  // Google Maps Places API 初始化 callback
+  function initGoogleMaps() {
+    window._googleMapsReady = true;
+  }
+</script>
+<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAyidoOUUKSzrSPq-5ALD4Mwr2wy5LgHuw&libraries=places&language=zh-TW&callback=initGoogleMaps" async defer></script>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
   :root {
@@ -937,59 +944,99 @@ function addDay() {
   showToast(`已新增第${trip.days.length}天`);
 }
 
-// ==================== AUTOCOMPLETE ====================
-let autocompleteTimer = null;
-let autocompleteResults = [];
+// ==================== AUTOCOMPLETE (Google Maps Places) ====================
+let _autocompleteService = null;
+let _autocompleteTimer = null;
+let _autocompletePredictions = [];
+let _placesService = null;
 
-function onSpotNameInput(val) {
-  clearTimeout(autocompleteTimer);
-  const dropdown = document.getElementById('spot-autocomplete-dropdown');
-  if (!val || val.length < 2) { dropdown.classList.remove('show'); dropdown.innerHTML = ''; return; }
-  dropdown.innerHTML = '<div class="autocomplete-loading">🔍 搜尋中...</div>';
-  dropdown.classList.add('show');
-  autocompleteTimer = setTimeout(() => searchPlaces(val), 400);
+function getAutocompleteService() {
+  if (!window.google || !window.google.maps || !window.google.maps.places) return null;
+  if (!_autocompleteService) {
+    _autocompleteService = new google.maps.places.AutocompleteService();
+  }
+  return _autocompleteService;
 }
 
-async function searchPlaces(query) {
-  const dropdown = document.getElementById('spot-autocomplete-dropdown');
-  try {
-    // 使用 Nominatim OpenStreetMap 免費 API
-    const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=6&accept-language=zh-TW,zh,en&addressdetails=1`;
-    const res = await fetch(url, { headers: { 'Accept-Language': 'zh-TW,zh;q=0.9,en;q=0.8' } });
-    const data = await res.json();
-    autocompleteResults = data;
-    if (!data || data.length === 0) {
-      dropdown.innerHTML = '<div class="autocomplete-loading">未找到相關地點</div>';
-      return;
-    }
-    dropdown.innerHTML = data.map((item, i) => {
-      // 取得地點名稱：優先用 display_name 的第一部分
-      const parts = item.display_name.split(',');
-      const placeName = item.namedetails ? (item.namedetails['name:zh'] || item.namedetails['name'] || parts[0]) : parts[0];
-      const shortAddr = parts.slice(1, 4).join(',').trim();
-      return `<div class="autocomplete-item" onmousedown="selectPlace(${i})">
-        <div class="autocomplete-item-name">${placeName.trim()}</div>
-        <div class="autocomplete-item-addr">${shortAddr}</div>
-      </div>`;
-    }).join('');
-  } catch(e) {
-    dropdown.innerHTML = '<div class="autocomplete-loading">搜尋失敗，請手動輸入</div>';
+function getPlacesService() {
+  if (!window.google || !window.google.maps || !window.google.maps.places) return null;
+  if (!_placesService) {
+    // 需要一個 DOM 元素來初始化
+    _placesService = new google.maps.places.PlacesService(document.createElement('div'));
   }
+  return _placesService;
+}
+
+function onSpotNameInput(val) {
+  clearTimeout(_autocompleteTimer);
+  const dropdown = document.getElementById('spot-autocomplete-dropdown');
+  if (!val || val.length < 1) { dropdown.classList.remove('show'); dropdown.innerHTML = ''; return; }
+  dropdown.innerHTML = '<div class="autocomplete-loading">🔍 搜尋中...</div>';
+  dropdown.classList.add('show');
+  _autocompleteTimer = setTimeout(() => searchPlaces(val), 300);
+}
+
+function searchPlaces(query) {
+  const dropdown = document.getElementById('spot-autocomplete-dropdown');
+  const svc = getAutocompleteService();
+  if (!svc) {
+    dropdown.innerHTML = '<div class="autocomplete-loading">地圖服務載入中，請稍候...</div>';
+    return;
+  }
+  svc.getPlacePredictions(
+    { input: query, language: 'zh-TW' },
+    (predictions, status) => {
+      if (status !== google.maps.places.PlacesServiceStatus.OK || !predictions || predictions.length === 0) {
+        dropdown.innerHTML = '<div class="autocomplete-loading">未找到相關地點</div>';
+        return;
+      }
+      _autocompletePredictions = predictions;
+      dropdown.innerHTML = predictions.map((p, i) => {
+        const mainText = p.structured_formatting.main_text;
+        const secText = p.structured_formatting.secondary_text || '';
+        return `<div class="autocomplete-item" onmousedown="selectPlace(${i})">
+          <div class="autocomplete-item-name">${mainText}</div>
+          <div class="autocomplete-item-addr">${secText}</div>
+        </div>`;
+      }).join('');
+    }
+  );
 }
 
 function selectPlace(index) {
-  const item = autocompleteResults[index];
-  if (!item) return;
-  const parts = item.display_name.split(',');
-  const placeName = item.namedetails ? (item.namedetails['name:zh'] || item.namedetails['name'] || parts[0]) : parts[0];
-  document.getElementById('spot-name-input').value = placeName.trim();
-  // 地址變為可編輯
+  const prediction = _autocompletePredictions[index];
+  if (!prediction) return;
+  const nameInput = document.getElementById('spot-name-input');
   const addrInput = document.getElementById('spot-address-input');
-  addrInput.value = item.display_name;
-  addrInput.removeAttribute('readonly');
-  addrInput.style.background = '';
-  addrInput.style.color = '';
+  // 先填入名稱
+  nameInput.value = prediction.structured_formatting.main_text;
+  addrInput.value = '地址載入中...';
   hideAutocomplete();
+  // 取得完整地址
+  const svc = getPlacesService();
+  if (svc) {
+    svc.getDetails(
+      { placeId: prediction.place_id, fields: ['formatted_address', 'name', 'geometry'] },
+      (place, status) => {
+        if (status === google.maps.places.PlacesServiceStatus.OK && place) {
+          addrInput.value = place.formatted_address || prediction.structured_formatting.secondary_text || '';
+          addrInput.removeAttribute('readonly');
+          addrInput.style.background = '';
+          addrInput.style.color = '';
+        } else {
+          addrInput.value = prediction.structured_formatting.secondary_text || '';
+          addrInput.removeAttribute('readonly');
+          addrInput.style.background = '';
+          addrInput.style.color = '';
+        }
+      }
+    );
+  } else {
+    addrInput.value = prediction.structured_formatting.secondary_text || '';
+    addrInput.removeAttribute('readonly');
+    addrInput.style.background = '';
+    addrInput.style.color = '';
+  }
 }
 
 function hideAutocomplete() {
