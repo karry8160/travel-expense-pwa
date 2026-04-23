@@ -242,12 +242,15 @@
   <div style="padding: 0 20px;">
     <div class="trip-cover" id="trip-cover-section">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;">
-        <div>
+        <div style="flex:1;">
           <h2 id="trip-cover-name">旅程名稱</h2>
           <div class="trip-dates" id="trip-cover-dates">日期</div>
           <div class="trip-days" id="trip-cover-days">共 N 天</div>
         </div>
-        <button onclick="showModal('modal-invite')" style="background:rgba(255,255,255,0.25);border:none;color:white;padding:6px 12px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;">👥 共編</button>
+        <div style="display:flex;gap:8px;">
+          <button onclick="openEditTrip()" style="background:rgba(255,255,255,0.25);border:none;color:white;padding:6px 12px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;">✏️ 編輯</button>
+          <button onclick="showModal('modal-invite')" style="background:rgba(255,255,255,0.25);border:none;color:white;padding:6px 12px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;">👥 共編</button>
+        </div>
       </div>
     </div>
     
@@ -273,9 +276,8 @@
     <div class="section-title">🗂️ 旅遊指南</div>
     <div class="card" style="padding:12px;">
       <div class="guide-grid">
-        <button class="guide-item" onclick="openGuide('flight')"><span class="guide-icon">✈️</span><span class="guide-label">機票</span></button>
+        <button class="guide-item" onclick="openGuide('transport')"><span class="guide-icon">🎫</span><span class="guide-label">交通票券</span></button>
         <button class="guide-item" onclick="openGuide('hotel')"><span class="guide-icon">🏨</span><span class="guide-label">住宿</span></button>
-        <button class="guide-item" onclick="openGuide('transport')"><span class="guide-icon">🚗</span><span class="guide-label">交通</span></button>
         <button class="guide-item" onclick="openGuide('file')"><span class="guide-icon">📁</span><span class="guide-label">檔案夾</span></button>
       </div>
     </div>
@@ -313,6 +315,9 @@
     <button class="action-btn" onclick="addDay()">＋天</button>
   </div>
   <div class="day-tabs" id="day-tabs-container"></div>
+  <div style="padding:0 20px 8px;display:flex;gap:8px;">
+    <button onclick="suggestRoute()" style="flex:1;background:linear-gradient(90deg,#1565C0,#0288D1);color:white;border:none;border-radius:12px;padding:10px;font-size:13px;font-weight:700;cursor:pointer;">⚡ 一鍵建議路線</button>
+  </div>
   <div style="padding: 0 20px;" id="day-content"></div>
   <button class="fab" onclick="addSpot()">＋</button>
 </div>
@@ -529,6 +534,26 @@
   </div>
 </div>
 
+<!-- Edit Trip Modal -->
+<div class="modal-overlay" id="modal-edit-trip">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">✏️ 編輯旅程</div>
+    <div class="form-group">
+      <label class="form-label">旅程名稱</label>
+      <input class="form-input" id="edit-trip-name" placeholder="旅程名稱" type="text">
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+      <div class="form-group"><label class="form-label">開始日期</label><input class="form-input" id="edit-trip-start" type="date"></div>
+      <div class="form-group"><label class="form-label">結束日期</label><input class="form-input" id="edit-trip-end" type="date"></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px;">
+      <button class="btn btn-secondary btn-full" onclick="closeModal('modal-edit-trip')">取消</button>
+      <button class="btn btn-primary btn-full" onclick="saveEditTrip()">儲存</button>
+    </div>
+  </div>
+</div>
+
 <!-- Add Expense Modal -->
 <div class="modal-overlay" id="modal-add-expense">
   <div class="modal">
@@ -558,6 +583,16 @@
       <input class="form-input" id="expense-desc-input" placeholder="例：兩人份午餐" type="text">
     </div>
     <div class="form-group">
+      <label class="form-label">付款方式</label>
+      <div class="chip-group" id="pay-method-chips">
+        <div class="chip selected" onclick="selectPayMethod(this,'現金')">💵 現金</div>
+        <div class="chip" onclick="selectPayMethod(this,'信用卡')">💳 信用卡</div>
+        <div class="chip" onclick="selectPayMethod(this,'電子支付')">📱 電子支付</div>
+        <div class="chip" onclick="selectPayMethod(this,'轉帳')">🏦 轉帳</div>
+        <div class="chip" onclick="selectPayMethod(this,'其他')">📦 其他</div>
+      </div>
+    </div>
+    <div class="form-group">
       <label class="form-label">付款人</label>
       <select class="form-input" id="expense-payer-input"></select>
     </div>
@@ -583,6 +618,39 @@
   </div>
 </div>
 
+<!-- Segment Transport Modal -->
+<div class="modal-overlay" id="modal-segment">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">🚗 設定交通方式</div>
+    <div class="form-group">
+      <label class="form-label">交通方式</label>
+      <div class="chip-group" id="seg-transport-chips">
+        <div class="chip selected" data-val="🚗 開車" onclick="this.closest('#seg-transport-chips,div').querySelectorAll('.chip').forEach(c=>c.classList.remove('selected'));this.classList.add('selected')">🚗 開車</div>
+        <div class="chip" data-val="🚌 大眾運輸" onclick="this.closest('#seg-transport-chips,div').querySelectorAll('.chip').forEach(c=>c.classList.remove('selected'));this.classList.add('selected')">🚌 大眾運輸</div>
+        <div class="chip" data-val="🚶 步行" onclick="this.closest('#seg-transport-chips,div').querySelectorAll('.chip').forEach(c=>c.classList.remove('selected'));this.classList.add('selected')">🚶 步行</div>
+        <div class="chip" data-val="🛵 機車" onclick="this.closest('#seg-transport-chips,div').querySelectorAll('.chip').forEach(c=>c.classList.remove('selected'));this.classList.add('selected')">🛵 機車</div>
+        <div class="chip" data-val="🚕 計程車" onclick="this.closest('#seg-transport-chips,div').querySelectorAll('.chip').forEach(c=>c.classList.remove('selected'));this.classList.add('selected')">🚕 計程車</div>
+        <div class="chip" data-val="🚲 腳踏車" onclick="this.closest('#seg-transport-chips,div').querySelectorAll('.chip').forEach(c=>c.classList.remove('selected'));this.classList.add('selected')">🚲 腳踏車</div>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+      <div class="form-group">
+        <label class="form-label">距離（選填）</label>
+        <input class="form-input" id="seg-distance-input" placeholder="例：5.2 km" type="text">
+      </div>
+      <div class="form-group">
+        <label class="form-label">所需時間（選填）</label>
+        <input class="form-input" id="seg-duration-input" placeholder="例：15 分鐘" type="text">
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px;">
+      <button class="btn btn-secondary btn-full" onclick="closeModal('modal-segment')">取消</button>
+      <button class="btn btn-primary btn-full" onclick="saveSegment()">儲存</button>
+    </div>
+  </div>
+</div>
+
 <!-- Add Luggage Modal -->
 <div class="modal-overlay" id="modal-add-luggage">
   <div class="modal">
@@ -590,8 +658,9 @@
     <div class="modal-title">🧳 新增行李項目</div>
     <div class="form-group">
       <label class="form-label">物品名稱</label>
-      <input class="form-input" id="luggage-name-input" placeholder="例：護照、充電器" type="text">
+      <input class="form-input" id="luggage-name-input" placeholder="例：護照、充電器" type="text" onkeydown="if(event.key==='Enter')saveLuggage()">
     </div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:6px;">💡 新增後會記憶，下次可直接選取</div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px;">
       <button class="btn btn-secondary btn-full" onclick="closeModal('modal-add-luggage')">取消</button>
       <button class="btn btn-primary btn-full" onclick="saveLuggage()">新增</button>
@@ -635,6 +704,19 @@
   <div class="modal">
     <div class="modal-handle"></div>
     <div class="modal-title" id="guide-modal-title">新增資料</div>
+    <div class="form-group" id="guide-ticket-type-group" style="display:none;">
+      <label class="form-label">票種</label>
+      <div class="chip-group" id="guide-ticket-chips">
+        <div class="chip selected" onclick="selectGuideTicket(this,'✈️ 機票')">✈️ 機票</div>
+        <div class="chip" onclick="selectGuideTicket(this,'🚢 船票')">🚢 船票</div>
+        <div class="chip" onclick="selectGuideTicket(this,'🚄 高鐵')">🚄 高鐵</div>
+        <div class="chip" onclick="selectGuideTicket(this,'🚌 客運')">🚌 客運</div>
+        <div class="chip" onclick="selectGuideTicket(this,'🚗 租車')">🚗 租車</div>
+        <div class="chip" onclick="selectGuideTicket(this,'🛵 機車')">🛵 機車</div>
+        <div class="chip" onclick="selectGuideTicket(this,'🚇 捷運')">🚇 捷運</div>
+        <div class="chip" onclick="selectGuideTicket(this,'🚕 計程車')">🚕 計程車</div>
+      </div>
+    </div>
     <div class="form-group">
       <label class="form-label">標題</label>
       <input class="form-input" id="guide-title-input" placeholder="例：去程機票" type="text">
@@ -668,6 +750,13 @@
           <label class="form-label">目的地</label>
           <input class="form-input" id="guide-to-input" placeholder="例：澎湖馬公" type="text">
         </div>
+      </div>
+    </div>
+    <div class="form-group" id="guide-arrive-group" style="display:none;">
+      <label class="form-label">抵達時間</label>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <input class="form-input" id="guide-arrive-date-input" type="date">
+        <input class="form-input" id="guide-arrive-time-input" type="time">
       </div>
     </div>
     <!-- 住宿專用欄位 -->
@@ -711,6 +800,9 @@
 <script>
 // ==================== DATA ====================
 let db = JSON.parse(localStorage.getItem('triplog_v3') || '{"trips":[]}');
+// 全域行李預設清單（跨旅程記憶）
+let globalLuggagePresets = JSON.parse(localStorage.getItem('triplog_luggage_presets') || 'null') || ['護照','機票','訂房確認信','充電器','行動電源','換洗衣物','盥洗用品','藥品','雨傘','太陽眼鏡','防曬乳','現金','信用卡','相機','耳機'];
+function saveGlobalPresets() { localStorage.setItem('triplog_luggage_presets', JSON.stringify(globalLuggagePresets)); }
 // 資料版本遷移：從 v2 遷移
 (function migratev2(){
   const old = localStorage.getItem('triplog_v2');
@@ -728,6 +820,8 @@ let selectedSpotType = '🍽️ 餐廳';
 let selectedExpCat = '🎫 門票';
 let selectedSplitMode = 'equal';
 let selectedSplitMembers = [];
+let selectedPayMethod = '現金';
+let dragSrcIdx = null;
 
 function saveDB() { localStorage.setItem('triplog_v3', JSON.stringify(db)); }
 function getTrip() { return db.trips.find(t => t.id === currentTripId); }
@@ -788,6 +882,43 @@ document.querySelectorAll('.modal-overlay').forEach(overlay => {
     if (e.target === this) this.classList.remove('active');
   });
 });
+
+// ==================== TRIP EDIT ====================
+function openEditTrip() {
+  const trip = getTrip();
+  if (!trip) return;
+  document.getElementById('edit-trip-name').value = trip.name || '';
+  document.getElementById('edit-trip-start').value = trip.startDate || '';
+  document.getElementById('edit-trip-end').value = trip.endDate || '';
+  showModal('modal-edit-trip');
+}
+
+function saveEditTrip() {
+  const trip = getTrip();
+  if (!trip) return;
+  const name = document.getElementById('edit-trip-name').value.trim();
+  const start = document.getElementById('edit-trip-start').value;
+  const end = document.getElementById('edit-trip-end').value;
+  if (!name) { showToast('請輸入旅程名稱'); return; }
+  trip.name = name;
+  trip.startDate = start;
+  trip.endDate = end;
+  // 重新計算天數（保留現有景點）
+  if (start && end) {
+    const s = new Date(start), e = new Date(end);
+    const diff = Math.round((e - s) / 86400000) + 1;
+    const newDays = [];
+    for (let i = 0; i < Math.max(diff, 1); i++) {
+      const d = new Date(s); d.setDate(d.getDate() + i);
+      const dateStr = d.toISOString().split('T')[0];
+      // 保留原有同日期的景點
+      const existing = trip.days.find(day => day.date === dateStr);
+      newDays.push(existing || { date: dateStr, spots: [] });
+    }
+    trip.days = newDays;
+  }
+  saveDB(); closeModal('modal-edit-trip'); renderTripDetail(); showToast('旅程已更新');
+}
 
 // ==================== TRIP ====================
 function createTrip() {
@@ -910,16 +1041,32 @@ function renderDayContent() {
     container.innerHTML = `<div class="empty-state"><div class="empty-icon">📍</div><h3>還沒有景點</h3><p>點擊右下角 ＋ 新增景點</p></div>`;
     return;
   }
+  const TRANSPORT_ICONS = { '🚗 開車': '🚗', '🚌 大眾運輸': '🚌', '🚶 步行': '🚶', '🛵 機車': '🛵', '🚕 計程車': '🚕', '🚲 腳踏車': '🚲' };
   container.innerHTML = day.spots.map((spot, idx) => {
     const spotExp = getSpotTotal(spot);
-    const connector = idx < day.spots.length - 1 ? `<div class="connector"><span>🚗</span><div class="connector-line"></div></div>` : '';
+    const nextSpot = day.spots[idx + 1];
+    const connector = nextSpot ? (() => {
+      const seg = (day.segments || [])[idx] || {};
+      const tMode = seg.transport || '🚗 開車';
+      const tIcon = TRANSPORT_ICONS[tMode] || '🚗';
+      const distText = seg.distance ? `${seg.distance}` : '';
+      const timeText = seg.duration ? `${seg.duration}` : '';
+      const infoText = [distText, timeText].filter(Boolean).join(' · ');
+      return `<div class="connector" onclick="openSegmentEditor(${idx})" style="cursor:pointer;">
+        <div style="display:flex;align-items:center;gap:6px;">
+          <span style="font-size:18px;">${tIcon}</span>
+          <div class="connector-line"></div>
+          <span style="font-size:11px;color:var(--muted);white-space:nowrap;">${infoText || '點擊設定'}</span>
+        </div>
+      </div>`;
+    })() : '';
     const imgHtml = spot.images && spot.images.length > 0
       ? `<img class="spot-card-img" src="${spot.images[0]}" alt="${spot.name}" onclick="openSpot('${spot.id}');event.stopPropagation();">`
       : '';
-    return `<div class="spot-card" onclick="openSpot('${spot.id}')">
+    return `<div class="spot-card" draggable="true" ondragstart="dragStart(event,${idx})" ondragover="dragOver(event)" ondrop="dragDrop(event,${idx})" ondragend="dragEnd(event)" onclick="openSpot('${spot.id}')">
       ${imgHtml}
       <div class="spot-card-body">
-        <div class="spot-num">${idx + 1}</div>
+        <div class="spot-num" style="cursor:grab;">${idx + 1}</div>
         <div class="spot-info">
           <div class="spot-name">${spot.name}</div>
           <div class="spot-time">${spot.time || ''} · ${spot.type || ''} · 停留${spot.duration || '1小時'}</div>
@@ -934,6 +1081,59 @@ function renderDayContent() {
   }).join('');
 }
 
+// ==================== 拖拉排序 ====================
+function dragStart(e, idx) {
+  dragSrcIdx = idx;
+  e.dataTransfer.effectAllowed = 'move';
+  e.currentTarget.style.opacity = '0.5';
+}
+function dragOver(e) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }
+function dragEnd(e) { e.currentTarget.style.opacity = '1'; }
+function dragDrop(e, targetIdx) {
+  e.preventDefault();
+  if (dragSrcIdx === null || dragSrcIdx === targetIdx) return;
+  const trip = getTrip();
+  const day = trip.days[currentDayIndex];
+  const spots = day.spots;
+  const [moved] = spots.splice(dragSrcIdx, 1);
+  spots.splice(targetIdx, 0, moved);
+  // 同步調整 segments
+  if (!day.segments) day.segments = [];
+  while (day.segments.length < spots.length - 1) day.segments.push({});
+  dragSrcIdx = null;
+  saveDB(); renderDayContent();
+}
+
+// ==================== 景點間交通設定 ====================
+let editingSegmentIdx = null;
+function openSegmentEditor(idx) {
+  editingSegmentIdx = idx;
+  const trip = getTrip();
+  const day = trip.days[currentDayIndex];
+  const seg = (day.segments || [])[idx] || {};
+  const modal = document.getElementById('modal-segment');
+  if (!modal) return;
+  document.getElementById('seg-transport-chips').querySelectorAll('.chip').forEach(c => {
+    c.classList.toggle('selected', c.dataset.val === (seg.transport || '🚗 開車'));
+  });
+  document.getElementById('seg-distance-input').value = seg.distance || '';
+  document.getElementById('seg-duration-input').value = seg.duration || '';
+  showModal('modal-segment');
+}
+function saveSegment() {
+  const trip = getTrip();
+  const day = trip.days[currentDayIndex];
+  if (!day.segments) day.segments = [];
+  while (day.segments.length < day.spots.length - 1) day.segments.push({});
+  const selected = document.querySelector('#seg-transport-chips .chip.selected');
+  day.segments[editingSegmentIdx] = {
+    transport: selected ? selected.dataset.val : '🚗 開車',
+    distance: document.getElementById('seg-distance-input').value.trim(),
+    duration: document.getElementById('seg-duration-input').value.trim()
+  };
+  saveDB(); closeModal('modal-segment'); renderDayContent();
+}
+
 function addDay() {
   const trip = getTrip();
   if (!trip) return;
@@ -942,6 +1142,22 @@ function addDay() {
   trip.days.push({ date: nextDate.toISOString().split('T')[0], spots: [] });
   saveDB(); currentDayIndex = trip.days.length - 1; renderItinerary();
   showToast(`已新增第${trip.days.length}天`);
+}
+
+// ==================== 一鍵建議路線 ====================
+function suggestRoute() {
+  const trip = getTrip();
+  if (!trip || !trip.days[currentDayIndex]) return;
+  const day = trip.days[currentDayIndex];
+  if (day.spots.length < 2) { showToast('需要至少 2 個景點才能建議路線'); return; }
+  // 依照時間排序
+  const sorted = [...day.spots].sort((a, b) => {
+    const ta = a.time || '00:00'; const tb = b.time || '00:00';
+    return ta.localeCompare(tb);
+  });
+  day.spots = sorted;
+  saveDB(); renderDayContent();
+  showToast('✅ 已依時間排序建議路線！');
 }
 
 // ==================== AUTOCOMPLETE (Google Maps Places) ====================
@@ -1186,7 +1402,7 @@ function renderSpotExpenses() {
       <div class="expense-cat-icon" style="background:var(--primary-light);">${exp.category.split(' ')[0]}</div>
       <div class="expense-info">
         <div class="expense-name">${exp.category}${exp.desc ? ' · ' + exp.desc : ''}</div>
-        <div class="expense-meta">付款：${exp.payer || '我'} · ${splitLabel}</div>
+        <div class="expense-meta">付款：${exp.payer || '我'} ${exp.payMethod ? '(' + exp.payMethod + ')' : ''} · ${splitLabel}</div>
       </div>
       <div class="expense-amount">$${parseFloat(exp.amount).toLocaleString()}</div>
       <button class="expense-delete" onclick="deleteSpotExpense('${exp.id}')">✕</button>
@@ -1209,7 +1425,9 @@ function openAddExpense(context) {
   selectedExpCat = '🎫 門票';
   selectedSplitMode = 'equal';
   selectedSplitMembers = [];
+  selectedPayMethod = '現金';
   document.querySelectorAll('#expense-cat-chips .chip').forEach((c,i) => c.classList.toggle('selected', i===0));
+  document.querySelectorAll('#pay-method-chips .chip').forEach((c,i) => c.classList.toggle('selected', i===0));
   document.getElementById('split-equal-chip').classList.add('selected');
   document.getElementById('split-custom-chip').classList.remove('selected');
   document.getElementById('split-self-chip').classList.remove('selected');
@@ -1252,6 +1470,11 @@ function toggleSplitMember(name) {
   renderSplitMembersList();
 }
 
+function selectPayMethod(el, method) {
+  document.querySelectorAll('#pay-method-chips .chip').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected'); selectedPayMethod = method;
+}
+
 function selectExpCat(el, cat) {
   document.querySelectorAll('#expense-cat-chips .chip').forEach(c => c.classList.remove('selected'));
   el.classList.add('selected'); selectedExpCat = cat;
@@ -1276,6 +1499,7 @@ function saveExpense() {
     category: selectedExpCat, amount,
     desc: document.getElementById('expense-desc-input').value.trim(),
     payer: document.getElementById('expense-payer-input').value,
+    payMethod: selectedPayMethod,
     split: selectedSplitMode,
     splitMembers: selectedSplitMode === 'custom' ? [...selectedSplitMembers] : null,
     createdAt: new Date().toISOString()
@@ -1328,13 +1552,13 @@ function renderExpenses() {
     list.innerHTML = '<div style="font-size:13px;color:var(--muted);text-align:center;padding:16px;">還沒有花費記錄</div>';
     return;
   }
-  list.innerHTML = [...expenses].reverse().map(exp => {
+    list.innerHTML = [...expenses].reverse().map(exp => {
     const splitLabel = exp.split === 'self' ? '個人支出' : exp.split === 'custom' ? `分攤：${(exp.splitMembers||[]).join('、')}` : '平均分攤';
     return `<div class="expense-item">
       <div class="expense-cat-icon" style="background:var(--primary-light);">${exp.category.split(' ')[0]}</div>
       <div class="expense-info">
         <div class="expense-name">${exp.category}${exp.desc ? ' · ' + exp.desc : ''}</div>
-        <div class="expense-meta">付款：${exp.payer || '我'} · ${splitLabel}</div>
+        <div class="expense-meta">付款：${exp.payer || '我'} ${exp.payMethod ? '(' + exp.payMethod + ')' : ''} · ${splitLabel}</div>
       </div>
       <div class="expense-amount">$${parseFloat(exp.amount).toLocaleString()}</div>
       <button class="expense-delete" onclick="deleteTripExpense('${exp.id}')">✕</button>
@@ -1416,7 +1640,7 @@ function renderSplit(trip, expenses, total) {
 }
 
 // ==================== LUGGAGE ====================
-const LUGGAGE_PRESETS = ['護照','機票','訂房確認信','充電器','行動電源','換洗衣物','盥洗用品','藥品','雨傘','太陽眼鏡','防曬乳','現金','信用卡','相機','耳機'];
+// LUGGAGE_PRESETS 改為使用 globalLuggagePresets（跨旅程記憶）
 
 function renderLuggage() {
   const trip = getTrip();
@@ -1426,7 +1650,7 @@ function renderLuggage() {
   document.getElementById('luggage-done-count').textContent = done;
   document.getElementById('luggage-total-count').textContent = luggage.length;
   document.getElementById('luggage-main-fill').style.width = luggage.length ? `${(done/luggage.length)*100}%` : '0%';
-  document.getElementById('luggage-presets').innerHTML = LUGGAGE_PRESETS.map(p => {
+  document.getElementById('luggage-presets').innerHTML = globalLuggagePresets.map(p => {
     const exists = luggage.find(l => l.name === p);
     return `<div class="chip ${exists ? 'selected' : ''}" onclick="togglePreset('${p}')">${p}</div>`;
   }).join('');
@@ -1467,7 +1691,13 @@ function saveLuggage() {
   if (!name) { showToast('請輸入物品名稱'); return; }
   const trip = getTrip();
   if (!trip.luggage) trip.luggage = [];
+  if (trip.luggage.find(l => l.name === name)) { showToast('已在清單中'); return; }
   trip.luggage.push({ id: Date.now().toString(), name, checked: false });
+  // 加入全域記憶清單
+  if (!globalLuggagePresets.includes(name)) {
+    globalLuggagePresets.push(name);
+    saveGlobalPresets();
+  }
   saveDB(); closeModal('modal-add-luggage');
   document.getElementById('luggage-name-input').value = '';
   renderLuggage();
@@ -1475,11 +1705,15 @@ function saveLuggage() {
 
 // ==================== GUIDE ====================
 const GUIDE_CONFIG = {
-  flight: { title: '✈️ 機票', icon: '✈️', empty: '✈️', hasTransport: true },
+  transport: { title: '🚌 交通票券', icon: '🎫', empty: '🎫', hasTransport: true, hasTicketType: true },
   hotel: { title: '🏨 住宿', icon: '🏨', empty: '🏨', hasHotel: true },
-  transport: { title: '🚗 交通', icon: '🚗', empty: '🚗', hasTransport: true },
   file: { title: '📁 檔案夾', icon: '📁', empty: '📁' }
 };
+let selectedGuideTicket = '✈️ 機票';
+function selectGuideTicket(el, type) {
+  document.querySelectorAll('#guide-ticket-chips .chip').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected'); selectedGuideTicket = type;
+}
 
 function openGuide(type) {
   currentGuideType = type;
@@ -1496,9 +1730,16 @@ function openAddGuideModal() {
   // 顯示/隱藏對應欄位
   document.getElementById('guide-transport-fields').style.display = cfg.hasTransport ? 'block' : 'none';
   document.getElementById('guide-hotel-fields').style.display = cfg.hasHotel ? 'block' : 'none';
+  document.getElementById('guide-arrive-group').style.display = cfg.hasTransport ? 'block' : 'none';
+  const ticketGroup = document.getElementById('guide-ticket-type-group');
+  if (ticketGroup) ticketGroup.style.display = cfg.hasTicketType ? 'block' : 'none';
+  // 重設票種選擇
+  selectedGuideTicket = '✈️ 機票';
+  document.querySelectorAll('#guide-ticket-chips .chip').forEach((c,i) => c.classList.toggle('selected', i===0));
   // 清空欄位
   ['guide-title-input','guide-company-input','guide-flightno-input','guide-date-input','guide-time-input',
-   'guide-from-input','guide-to-input','guide-checkin-input','guide-checkout-input','guide-link-input'].forEach(id => {
+   'guide-from-input','guide-to-input','guide-checkin-input','guide-checkout-input','guide-link-input',
+   'guide-arrive-date-input','guide-arrive-time-input'].forEach(id => {
     const el = document.getElementById(id); if (el) el.value = '';
   });
   showModal('modal-add-guide');
@@ -1518,9 +1759,11 @@ function renderGuide() {
 
   list.innerHTML = items.map(item => {
     let details = '';
+    if (item.ticketType) details += `<div class="guide-detail-row"><span style="font-size:15px;">${item.ticketType}</span></div>`;
     if (item.company) details += `<div class="guide-detail-row">🏢 <span>${item.company}</span>${item.flightNo ? ` &nbsp;|&nbsp; 班次：<span>${item.flightNo}</span>` : ''}</div>`;
-    if (item.date || item.time) details += `<div class="guide-detail-row">📅 <span>${item.date || ''}${item.date && item.time ? ' ' : ''}${item.time || ''}</span></div>`;
-    if (item.from || item.to) details += `<div class="guide-detail-row">🛫 <span>${item.from || '?'}</span> → <span>${item.to || '?'}</span></div>`;
+    if (item.date || item.time) details += `<div class="guide-detail-row">🛫 出發：<span>${item.date || ''}${item.date && item.time ? ' ' : ''}${item.time || ''}</span></div>`;
+    if (item.arriveDate || item.arriveTime) details += `<div class="guide-detail-row">🛬 抵達：<span>${item.arriveDate || ''}${item.arriveDate && item.arriveTime ? ' ' : ''}${item.arriveTime || ''}</span></div>`;
+    if (item.from || item.to) details += `<div class="guide-detail-row">📍 <span>${item.from || '?'}</span> → <span>${item.to || '?'}</span></div>`;
     if (item.checkIn) details += `<div class="guide-detail-row">🛎️ 入住：<span>${item.checkIn}</span>${item.checkOut ? ` &nbsp;退房：<span>${item.checkOut}</span>` : ''}</div>`;
     if (item.link) details += `<div class="guide-detail-row">📋 <span style="word-break:break-all;">${item.link}</span></div>`;
 
@@ -1542,7 +1785,9 @@ function saveGuide() {
   if (!trip.guide) trip.guide = {};
   if (!trip.guide[currentGuideType]) trip.guide[currentGuideType] = [];
 
+  const cfg = GUIDE_CONFIG[currentGuideType];
   const item = { id: Date.now().toString(), title };
+  if (cfg.hasTicketType) item.ticketType = selectedGuideTicket;
   // 交通/機票欄位
   const companyEl = document.getElementById('guide-company-input');
   if (companyEl && companyEl.value.trim()) item.company = companyEl.value.trim();
@@ -1556,6 +1801,11 @@ function saveGuide() {
   if (fromEl && fromEl.value.trim()) item.from = fromEl.value.trim();
   const toEl = document.getElementById('guide-to-input');
   if (toEl && toEl.value.trim()) item.to = toEl.value.trim();
+  // 抵達時間
+  const arriveDateEl = document.getElementById('guide-arrive-date-input');
+  if (arriveDateEl && arriveDateEl.value) item.arriveDate = arriveDateEl.value;
+  const arriveTimeEl = document.getElementById('guide-arrive-time-input');
+  if (arriveTimeEl && arriveTimeEl.value) item.arriveTime = arriveTimeEl.value;
   // 住宿欄位
   const checkInEl = document.getElementById('guide-checkin-input');
   if (checkInEl && checkInEl.value) item.checkIn = checkInEl.value;
@@ -1744,6 +1994,22 @@ function showToast(msg) {
 }
 
 // ==================== INIT ====================
+// 資料遷移：將舊的 flight 資料合併到 transport
+(function migrateGuide() {
+  db.trips.forEach(trip => {
+    if (!trip.guide) trip.guide = {};
+    if (trip.guide.flight && trip.guide.flight.length > 0) {
+      if (!trip.guide.transport) trip.guide.transport = [];
+      trip.guide.flight.forEach(f => {
+        if (!trip.guide.transport.find(t => t.id === f.id)) {
+          trip.guide.transport.unshift({ ...f, ticketType: '✈️ 機票' });
+        }
+      });
+      trip.guide.flight = [];
+      saveDB();
+    }
+  });
+})();
 renderTripList();
 </script>
 </body>
